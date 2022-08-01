@@ -1,0 +1,20 @@
+name: mna
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - pytorch3d
+  - defaults
+dependencies:
+  - cudatoolkit=11.1.74
+  - setuptools=59.5.0
+  - python=3.8
+  - pip=21.3.1
+  - easydict=1.9
+  - numpy=1.21.3
+  - pytorch=1.9.1
+  - torchvision=0.10.1
+  - tensorboard=2.6.0
+  - pytorch-lightning=1.4.9
+  - torchmetrics=0.6.2
+  - pytorch3d=0.6.1

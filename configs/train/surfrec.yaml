@@ -1,0 +1,174 @@
+---
+seed:                             # [H] { <int>, <empty> (randomly selected) }
+input: [ pcl ]                    #     { <list of inputs, apart from UV samples> }
+                                  #     currently supports { [], [ pcl ], [ pcl, nml ], [ img ] }
+target: [ ]                       #     { <list of targets, apart from point cloud> }
+                                  #     currently supports { [ ], [ nml ] }
+
+data:
+  dataset: cloth3d++              #     { shapenet, cloth3d++ }
+  dataset_directory: /home/low5545/datasets/cloth3d++
+  classes: all                    #     { all, <list of object class names> (according to 
+                                  #       metadata.yaml for ShapeNet) }
+  train_dataset_ratio: 1.0        #     { <int> (number of train effective batches),
+                                  #       [0.0, 1.0] (fraction of train dataset) }
+  val_dataset_ratio: 1.0          #     { <int> (number of validation effective batches),
+                                  #       [0.0, 1.0] (fraction of validation dataset) }
+  test_dataset_ratio: 1.0         #     { <int> (number of test effective batches),
+                                  #       [0.0, 1.0] (fraction of test dataset) }
+  overfit: false                  #     If true, validation & test datasets will be replaced
+                                  #     with train dataset (including transforms) 
+  train_dataset_perm_seed:        #     { <empty> (set to seed above), <int> }
+  eval_dataset_perm_seed: 3       #     { <empty> (no permutation), <int> }
+
+  uv_space_scale: 1.0             # [H] affects activation function of conditional homeomorphism
+  uv_sampling_dist: uniform       # [H] { uniform, poisson-disk }
+  train_uv_max_sample_size: 5000  # [H] multiple of number of charts
+  eval_uv_max_sample_size: 5000   #     multiple of number of charts
+
+  pcl_nml_replace_samples: false  # [H]
+  train_target_pcl_nml_size: 2500 # [H] multiple of number of charts
+  eval_target_pcl_nml_size: 2500  #     multiple of number of charts
+  pcl_normalization_mode: ball    # [H] { ball, cube }
+  pcl_normalization_scale: 1.0    # [H] affects activation function of conditional homeomorphism
+
+  train_eff_batch_size: 32        # [H] multiple of total number of gpus across all nodes
+  val_eff_batch_size: 32          #     multiple of total number of gpus across all nodes
+  test_eff_batch_size: 32         #     multiple of total number of gpus across all nodes
+  num_workers_per_node: 16        #     multiple of number of gpus per node
+
+  # input-dependent configs
+  input_pcl:
+    input_pcl_nml_size: 2500      # [H]
+    input_noise_std: 0.0          # [H]
+    target_noise: false           #     add the same noise as the input point cloud, or not
+    random_rotation: false        # [H]
+    random_xy_reflection: false   # [H] (ShapeNet: left-right reflection)
+    trim_lower_half: false        #     lower half along the y-axis (ShapeNetCore_v1 objects are 
+                                  #     aligned with the y-axis being the up direction & x-axis
+                                  #     being the front direction)
+  input_nml:
+    input_noise_std: 0.0          # [H] standard deviation of the random rotation angle in degrees,
+                                  #     about a random axis perpendicular to the surface normal
+    target_noise: false           #     add the same noise as the input surface normal, or not
+  input_img:
+    img_size: 224                 # [H] { 137 (original), 224 (ImageNet) }
+    target_pcl_frame: object      # [H] { object, viewpt_object }
+    brightness_jitter_factor: 0.0 # [H] [ 0.0, 1.0 ]
+    contrast_jitter_factor: 0.0   # [H] [ 0.0, 1.0 ]
+    saturation_jitter_factor: 0.0 # [H] [ 0.0, 1.0 ]
+    hue_jitter_factor: 0.0        # [H] [ 0.0, 0.5 ]
+    random_hflip: false           # [H] affects camera parameters and target point cloud
+    random_vflip: false           # [H] affects camera parameters and target point cloud
+
+model:
+  num_charts: 2                   # [H]
+  train_uv_sample_size: 5000      # [H] multiple of number of charts
+  eval_uv_presample_size: 1667    #     multiple of number of charts
+  min_interior_ratio: 0.4         # [H]
+  prob_occ_threshold: 0.5         # [H] [ 0.0, 1.0 ]
+  checkpoint_filepath:            # [H] { <empty>, <str> }
+
+  # model-component configs
+  encoder:
+    latent_dims: 1024             # [H] 0 (no input, hence empty latent code)
+    pretrained: false             # [H] pcl: affects `data.pcl_normalization_mode` and 
+                                  #          `data.pcl_normalization_scale`
+                                  #     img: affects `data.input_img.img_size` and image pixel 
+                                  #          normalization
+    load_state_dict: false        # [H] { false, true (`model.checkpoint_filepath` must not be empty) }
+    freeze: false                 # [H] { false, true (`model.encoder.load_state_dict` must be true) }
+  cond_sdf:
+    reduced_latent_dims:          # [H] { <empty> (no latent code reduction), <int> }
+    num_pos_encoding_octaves: 6   # [H] { <empty> (skip positional encoding), <int> }
+    num_hidden_layers: 4          # [H]
+    hidden_layer_dims: 512        # [H]
+    hidden_activation: relu       # [H] { softplus, relu, siren }
+    output_activation:            # [H] { <empty>, tanh }
+    weight_norm: true             # [H]
+    concat_input: midway          # [H] { all (except input layer & last hidden layer),
+                                  #       midway, <empty> (no input concat) }
+    load_state_dict: false        # [H] { false, true (`model.checkpoint_filepath` must not be empty) }
+    freeze: false                 # [H] { false, true (`model.cond_sdf.load_state_dict` must be true) }
+  cond_homeomorphism:
+    reduced_latent_dims:          # [H] { <empty> (no latent code reduction), <int> }
+    arch: inv_mlp                 # [H] { inv_mlp }
+    load_state_dict: false        # [H] { false, true (`model.checkpoint_filepath` must not be empty) }
+    freeze: false                 # [H] { false, true (`model.cond_homeomorphism.load_state_dict` must be true) }
+
+    # architecture-dependent configs
+    inv_mlp:
+      num_hidden_layers: 4        # [H] 8
+      hidden_layer_dims: 512      # [H]
+      hidden_activation: softplus # [H] { softplus, relu }
+      fwd_output_activation:      # [H] { <empty>, tanh }
+      rev_output_activation:      # [H] { <empty>, tanh }
+      weight_norm: true           # [H]
+      concat_input: midway        # [H] { all (except input layer & last hidden layer),
+                                  #       midway, <empty> (no input concat) }
+
+loss:
+  sigmoid_temperature: 1.0        # [H] 1.0 (cond_occupancy)
+  distortion_eps: 1.0e-8          # [H]
+  decouple_grad_flow: true        # [H] { true (the loss gradient flow through the conditional
+                                  #       SDF does not flow through the conditional homeomorphism),
+                                  #       false (otherwise, if applicable) }
+  weight:                         #     relative to the constant 1.0 weight of `chamfer_dist`
+    occupancy: 1.0                # [H]
+    distortion: 0.00001           # [H]
+
+metric:
+  default_chamfer_dist: 10.0      # [H]
+  default_f_score: 0.0            # [H]
+  default_distortion: 100.0       # [H]
+  f_score_scale_ratio: 0.02       # [H] [0.0, 2.0]
+  distortion_eps: 1.0e-8          # [H]
+  degen_chart_area_ratio: 0.01    # [H]
+
+optimizer:
+  algo: adam                      # [H] { adam }
+  lr: 0.001                       # [H]
+
+lr_scheduler:
+  algo: multi_step_lr             # [H] { multi_step_lr }
+  interval: epoch                 # [H] { epoch, step }
+
+  # algorithm-dependent configs
+  multi_step_lr:
+    milestones: [ 120, 140, 145 ] # [H]
+    gamma: 0.1                    # [H]
+
+logger:
+  save_dir: /home/low5545/dev/minimal-neural-atlas/logs
+  name: "train/surfrec/cloth3d++/num_charts=2/distortion=0.00001"
+  version:
+
+checkpoint:
+  dirpath:
+  monitor: "val/epoch"
+  mode: "max"
+  save_top_k: 3
+  save_weights_only: false
+  every_n_epochs: 3
+
+trainer:
+  num_nodes: 1
+  gpus: [ 0 ]                     #     { <empty> (CPU), <list of gpu ids> (GPU) }. Same across all nodes.
+                                  #     For testing, the total number of gpus across all nodes must be a
+                                  #     factor of the length of the testing dataset
+  accelerator:                    #     { <empty> (single CPU/GPU), ddp (GPU), ddp_spawn (GPU) }
+
+  max_epochs: 150
+  log_every_n_steps: 100
+  check_val_every_n_epoch: 3
+  flush_logs_every_n_steps: 400
+  limit_train_batches: 1.0
+
+  # for debugging purposes
+  # fast_dev_run: True
+  # logger: False
+  # checkpoint_callback: False
+
+  # other useful options
+  # resume_from_checkpoint:
+  # accumulate_grad_batches:
