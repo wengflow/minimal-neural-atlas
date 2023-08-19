@@ -20,7 +20,7 @@ If you find our work or code useful, please consider citing us with:
 We recommend using [Conda](https://conda.io/) to set up an environment with the appropriate dependencies for running our code. This can simply be done by running:
 
 ```bash
-git clone https://github.com/low5545/minimal-neural-atlas.git
+git clone https://github.com/wengflow/minimal-neural-atlas.git
 cd minimal-neural-atlas
 conda env create -f environment.yml
 ```
